@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>German Study App - Test Yourself</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .nav-btn {
+        @apply py-3 px-6 text-lg font-medium text-slate-400 rounded-t-lg border-b-4 border-transparent hover:text-sky-400 hover:border-sky-400 transition-all duration-300;
+      }
+      .nav-btn-active {
+        @apply text-sky-500 border-sky-500;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-slate-900 text-slate-200 flex items-center justify-center min-h-screen p-4"
+  >
+    <div
+      class="w-full max-w-4xl bg-slate-800 rounded-xl shadow-2xl p-6 md:p-8 space-y-6"
+    >
+      <!-- === NAVIGATION === -->
+      <nav class="flex border-b-2 border-slate-700">
+        <a href="index.html" class="nav-btn">PDF Generator</a>
+        <button class="nav-btn nav-btn-active">Test Yourself</button>
+      </nav>
+
+      <!-- === TEST PAGE === -->
+      <div id="page-test">
+        <p class="text-center text-slate-400 -mt-4 mb-6">
+          Select a saved lesson and test your knowledge.
+        </p>
+
+        <!-- Lesson Select -->
+        <div
+          id="lesson-select-container"
+          class="flex flex-col items-center space-y-4"
+        >
+          <label for="lesson-select" class="text-lg font-medium"
+            >Choose a lesson to test:</label
+          >
+          <select
+            id="lesson-select"
+            class="w-full max-w-xs p-3 bg-slate-700 border border-slate-600 rounded-md focus:ring-2 focus:ring-sky-500"
+          >
+            <option value="">-- Select a lesson --</option>
+          </select>
+          <button
+            id="startTestBtn"
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105 duration-300 shadow-lg"
+          >
+            Start Test
+          </button>
+        </div>
+
+        <!-- Test Area -->
+        <div id="test-area" class="hidden space-y-4">
+          <h2
+            id="test-title"
+            class="text-2xl font-bold text-center text-sky-400"
+          ></h2>
+          <div
+            id="test-form-container"
+            class="space-y-3 max-h-96 overflow-y-auto p-4 bg-slate-700 rounded-lg"
+          ></div>
+          <button
+            id="finishTestBtn"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-all duration-300 shadow-lg"
+          >
+            Finish Test & See Results
+          </button>
+        </div>
+
+        <!-- Results Area -->
+        <div id="results-area" class="hidden space-y-4">
+          <h2 id="score-display" class="text-3xl font-bold text-center"></h2>
+          <div
+            id="results-table-container"
+            class="max-h-80 overflow-y-auto"
+          ></div>
+          <div class="flex flex-col md:flex-row gap-4 justify-center">
+            <button
+              id="retestPdfBtn"
+              class="hidden w-full md:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg"
+            >
+              Create PDF of Wrong Words
+            </button>
+            <button
+              id="testAgainBtn"
+              class="w-full md:w-auto bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg"
+            >
+              Test Another Lesson
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const LOCAL_STORAGE_PREFIX = "vocab-list-";
+      let currentTestWords = [];
+      let wrongWords = [];
+
+      function populateLessonSelect() {
+        const select = document.getElementById("lesson-select");
+        select.innerHTML = '<option value="">-- Select a lesson --</option>';
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key.startsWith(LOCAL_STORAGE_PREFIX)) {
+            const lessonId = key.replace(LOCAL_STORAGE_PREFIX, "");
+            select.innerHTML += `<option value="${lessonId}">Lektion ${lessonId}</option>`;
+          }
+        }
+      }
+
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      function startTest() {
+        const lessonId = document.getElementById("lesson-select").value;
+        if (!lessonId) return;
+        const rawData = localStorage.getItem(LOCAL_STORAGE_PREFIX + lessonId);
+        currentTestWords = shuffleArray(JSON.parse(rawData));
+
+        const container = document.getElementById("test-form-container");
+        container.innerHTML = "";
+        currentTestWords.forEach((word, index) => {
+          container.innerHTML += `
+          <div class="grid grid-cols-2 gap-4 items-center">
+            <label for="word-${index}" class="text-slate-300 text-right">${word.translation}</label>
+            <input type="text" id="word-${index}" data-index="${index}" class="p-2 bg-slate-800 border border-slate-600 rounded-md focus:ring-2 focus:ring-sky-500 text-slate-200">
+          </div>`;
+        });
+
+        document.getElementById(
+          "test-title"
+        ).textContent = `Test: Lektion ${lessonId}`;
+        document
+          .getElementById("lesson-select-container")
+          .classList.add("hidden");
+        document.getElementById("results-area").classList.add("hidden");
+        document.getElementById("test-area").classList.remove("hidden");
+      }
+
+      function finishTest() {
+        let score = 0;
+        wrongWords = [];
+        let results = [];
+
+        const inputs = document.querySelectorAll("#test-form-container input");
+        inputs.forEach((input) => {
+          const index = parseInt(input.dataset.index);
+          const word = currentTestWords[index];
+          const userAnswer = input.value.trim();
+          const correctAnswer = word.word.trim();
+          const isCorrect =
+            userAnswer.toLowerCase() === correctAnswer.toLowerCase();
+          results.push({
+            translation: word.translation,
+            userAnswer,
+            correctAnswer,
+            isCorrect,
+          });
+          if (isCorrect) score++;
+          else wrongWords.push(word);
+        });
+
+        document.getElementById(
+          "score-display"
+        ).textContent = `Your Score: ${score} / ${currentTestWords.length}`;
+        const tableContainer = document.getElementById(
+          "results-table-container"
+        );
+        let tableHTML = `<table class="w-full text-left text-sm text-slate-300"><thead class="bg-slate-700 text-xs uppercase"><tr><th class="p-3">Übersetzung</th><th class="p-3">Your Answer</th><th class="p-3">Correct Answer</th></tr></thead><tbody>`;
+        results.forEach((res) => {
+          const rowClass = res.isCorrect ? "bg-green-900/50" : "bg-red-900/50";
+          const userText = res.isCorrect
+            ? `text-green-400`
+            : `text-red-400 line-through`;
+          tableHTML += `<tr class="${rowClass} border-b border-slate-700"><td class="p-3">${
+            res.translation
+          }</td><td class="p-3 ${userText}">${
+            res.userAnswer || "---"
+          }</td><td class="p-3 text-green-400">${res.correctAnswer}</td></tr>`;
+        });
+        tableHTML += "</tbody></table>";
+        tableContainer.innerHTML = tableHTML;
+
+        document
+          .getElementById("retestPdfBtn")
+          .classList.toggle("hidden", wrongWords.length === 0);
+        document.getElementById("test-area").classList.add("hidden");
+        document.getElementById("results-area").classList.remove("hidden");
+      }
+
+      function generateWrongWordsPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const tableBody = wrongWords.map((w) => [
+          w.gender || "-",
+          w.word || "",
+          w.pronunciation || "",
+          w.translation || "",
+        ]);
+        doc.autoTable({
+          head: [["Geschlecht", "Wort", "Aussprache", "Übersetzung"]],
+          body: tableBody,
+        });
+        doc.save("wrong_words_list.pdf");
+      }
+
+      function testAgain() {
+        document.getElementById("results-area").classList.add("hidden");
+        document
+          .getElementById("lesson-select-container")
+          .classList.remove("hidden");
+        populateLessonSelect();
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        populateLessonSelect();
+        document
+          .getElementById("startTestBtn")
+          .addEventListener("click", startTest);
+        document
+          .getElementById("finishTestBtn")
+          .addEventListener("click", finishTest);
+        document
+          .getElementById("retestPdfBtn")
+          .addEventListener("click", generateWrongWordsPDF);
+        document
+          .getElementById("testAgainBtn")
+          .addEventListener("click", testAgain);
+      });
+    </script>
+  </body>
+</html>
